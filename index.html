@@ -70,23 +70,39 @@
     </form>
   </div>
 
+  <!-- Plain script (not a module) so the eye works even if the Firebase files fail to load -->
+  <script>
+    (function () {
+      var t = document.getElementById("pwToggle"), p = document.getElementById("password");
+      t.addEventListener("click", function () {
+        var show = p.type === "password";
+        p.type = show ? "text" : "password";
+        t.classList.toggle("shown", show);
+        t.setAttribute("aria-pressed", String(show));
+        t.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      });
+      // Safety net: if the Firebase module did not load, never submit the form natively
+      // (that would reload the page and put the password in the address bar).
+      document.getElementById("loginForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (window.__loginReady) return;
+        var m = document.getElementById("msg");
+        m.className = "msg error";
+        m.textContent = "Login script could not start. Check that firebase-config.js is in the same folder and exports auth and db (press F12 > Console for details).";
+      });
+    })();
+  </script>
+
   <script type="module">
     import { auth, db } from "./firebase-config.js";
     import { onAuthStateChanged, signInWithEmailAndPassword, signOut }
       from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
     import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
+    window.__loginReady = true;   // the Firebase imports above loaded fine
+
     const $ = id => document.getElementById(id);
     const say = (text, type = "error") => { const m = $("msg"); m.textContent = text; m.className = text ? `msg ${type}` : "msg"; };
-
-    // Show / hide password
-    $("pwToggle").addEventListener("click", () => {
-      const t = $("pwToggle"), show = $("password").type === "password";
-      $("password").type = show ? "text" : "password";
-      t.classList.toggle("shown", show);
-      t.setAttribute("aria-pressed", String(show));
-      t.setAttribute("aria-label", show ? "Hide password" : "Show password");
-    });
 
     let busy = false;   // stops the auth listener from redirecting mid-login
 
