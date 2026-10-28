@@ -21,7 +21,7 @@
       </svg>
       <h1>AndrewGo Admin</h1>
     </div>
-    <nav><span id="adminEmail" class="admin-email"></span><a href="home.html">My Biodata</a></nav>
+    <nav><span id="adminEmail" class="admin-email"></span><a href="#" id="signOut">Sign out</a></nav>
   </header>
 
   <p id="pageMsg" class="msg" role="status" style="margin:12px 14px"></p>
@@ -88,7 +88,7 @@
 
   <script type="module">
     import { auth, db } from "./firebase-config.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
     import { doc, getDoc, setDoc, deleteDoc, collection, query, onSnapshot, writeBatch, arrayUnion, serverTimestamp }
       from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
@@ -105,6 +105,11 @@
     const fmtRange = r => r.start === r.end ? r.start : `${r.start} → ${r.end}`;
 
     let bookings = [], vehicles = [], filter = "pending", editingId = null;
+
+    $("signOut").addEventListener("click", async e => {
+      e.preventDefault();
+      try { await signOut(auth); } finally { window.location.replace("index.html"); }
+    });
 
     /* ---------- Navigation ---------- */
     const VIEWS = ["overview", "bookings", "cars", "inventory"];
@@ -316,7 +321,7 @@
     }
 
     onAuthStateChanged(auth, async u => {
-      if (!u) { window.location.replace("login.html"); return; }
+      if (!u) { window.location.replace("index.html"); return; }
       try {
         const a = await getDoc(doc(db, "admins", u.uid));
         if (!a.exists()) { say("pageMsg", "This page is for admins only."); return; }
