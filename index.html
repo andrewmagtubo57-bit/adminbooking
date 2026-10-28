@@ -13,6 +13,14 @@
     .login-card .logo{display:block;width:64px;height:64px;margin:0 auto 10px}
     .login-card .btn{width:100%}
     .login-card .sub{text-align:center;margin:0 0 6px}
+    .pw-wrap{position:relative}
+    .pw-wrap input{padding-right:48px}
+    .pw-toggle{position:absolute;top:0;right:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:0 6px 6px 0;color:var(--ink);cursor:pointer}
+    .pw-toggle:focus-visible{outline:2px solid var(--ink);outline-offset:-4px}
+    .pw-toggle svg{width:22px;height:22px}
+    .pw-toggle .off{display:none}
+    .pw-toggle.shown .on{display:none}
+    .pw-toggle.shown .off{display:block}
   </style>
 </head>
 <body>
@@ -49,7 +57,13 @@
       <input type="email" id="email" autocomplete="username" placeholder="admin@example.com" required>
 
       <label for="password">Password</label>
-      <input type="password" id="password" autocomplete="current-password" placeholder="Your password" required>
+      <div class="pw-wrap">
+        <input type="password" id="password" autocomplete="current-password" placeholder="Your password" required>
+        <button type="button" id="pwToggle" class="pw-toggle" aria-label="Show password" aria-pressed="false">
+          <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
 
       <p id="msg" class="msg" role="status" aria-live="polite"></p>
       <button class="btn" id="loginBtn" type="submit">Log in</button>
@@ -64,6 +78,15 @@
 
     const $ = id => document.getElementById(id);
     const say = (text, type = "error") => { const m = $("msg"); m.textContent = text; m.className = text ? `msg ${type}` : "msg"; };
+
+    // Show / hide password
+    $("pwToggle").addEventListener("click", () => {
+      const t = $("pwToggle"), show = $("password").type === "password";
+      $("password").type = show ? "text" : "password";
+      t.classList.toggle("shown", show);
+      t.setAttribute("aria-pressed", String(show));
+      t.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    });
 
     let busy = false;   // stops the auth listener from redirecting mid-login
 
