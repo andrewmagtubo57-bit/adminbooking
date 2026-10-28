@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#171717">
+  <title>Admin Login | AndrewGo Rentals</title>
+  <link rel="stylesheet" href="booking.css">
+  <style>
+    .login-wrap{min-height:calc(100vh - 70px);display:flex;align-items:center;justify-content:center;padding:20px}
+    .login-card{width:100%;max-width:400px}
+    .login-card h2{margin-top:0;text-align:center}
+    .login-card .logo{display:block;width:64px;height:64px;margin:0 auto 10px}
+    .login-card .btn{width:100%}
+    .login-card .sub{text-align:center;margin:0 0 6px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" role="img" aria-label="AndrewGo Rentals logo">
+        <rect width="48" height="48" rx="12" fill="#171717"/>
+        <path d="M24 3a6 6 0 0 0-6 6c0 4.5 6 10 6 10s6-5.5 6-10a6 6 0 0 0-6-6z" fill="#21F1A8"/>
+        <circle cx="24" cy="9" r="2.2" fill="#171717"/>
+        <path d="M13 26l2.5-5.5h17L35 26z" fill="#21F1A8"/>
+        <rect x="8" y="26" width="32" height="10" rx="3" fill="#21F1A8"/>
+        <circle cx="16" cy="37" r="3.6" fill="#171717" stroke="#21F1A8" stroke-width="2"/>
+        <circle cx="32" cy="37" r="3.6" fill="#171717" stroke="#21F1A8" stroke-width="2"/>
+      </svg>
+      <h1>AndrewGo Admin</h1>
+    </div>
+  </header>
+
+  <div class="login-wrap">
+    <form id="loginForm" class="panel login-card" novalidate>
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
+        <rect width="48" height="48" rx="12" fill="#21F1A8"/>
+        <path d="M24 3a6 6 0 0 0-6 6c0 4.5 6 10 6 10s6-5.5 6-10a6 6 0 0 0-6-6z" fill="#171717"/>
+        <circle cx="24" cy="9" r="2.2" fill="#21F1A8"/>
+        <path d="M13 26l2.5-5.5h17L35 26z" fill="#171717"/>
+        <rect x="8" y="26" width="32" height="10" rx="3" fill="#171717"/>
+        <circle cx="16" cy="37" r="3.6" fill="#21F1A8" stroke="#171717" stroke-width="2"/>
+        <circle cx="32" cy="37" r="3.6" fill="#21F1A8" stroke="#171717" stroke-width="2"/>
+      </svg>
+      <h2>Admin login</h2>
+      <p class="muted sub">Authorized staff only.</p>
+
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" placeholder="admin@example.com" required>
+
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" placeholder="Your password" required>
+
+      <p id="msg" class="msg" role="status" aria-live="polite"></p>
+      <button class="btn" id="loginBtn" type="submit">Log in</button>
+    </form>
+  </div>
+
+  <script type="module">
+    import { auth, db } from "./firebase-config.js";
+    import { onAuthStateChanged, signInWithEmailAndPassword, signOut }
+      from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    const $ = id => document.getElementById(id);
+    const say = (text, type = "error") => { const m = $("msg"); m.textContent = text; m.className = text ? `msg ${type}` : "msg"; };
+
+    let busy = false;   // stops the auth listener from redirecting mid-login
+
+    async function isAdmin(uid) {
+      return (await getDoc(doc(db, "admins", uid))).exists();
+    }
+
+    // Already signed in as an admin? Skip the form.
+    onAuthStateChanged(auth, async u => {
+      if (!u || busy) return;
+      try { if (await isAdmin(u.uid)) window.location.replace("admin.html"); }
+      catch (e) { console.error(e); }
+    });
+
+    $("loginForm").addEventListener("submit", async e => {
+      e.preventDefault(); say("");
+      const email = $("email").value.trim(), pass = $("password").value;
+      if (!email || !pass) return say("Enter your email and password.");
+      busy = true; $("loginBtn").disabled = true;
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email, pass);
+        if (!(await isAdmin(cred.user.uid))) {
+          await signOut(auth);
+          say("This account does not have admin access.");
+          return;
+        }
+        say("Welcome back! Opening the admin panel...", "ok");
+        window.location.replace("admin.html");
+      } catch (err) {
+        console.error(err);
+        const bad = ["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-email"];
+        say(bad.includes(err.code) ? "Incorrect email or password."
+          : err.code === "auth/too-many-requests" ? "Too many attempts. Please wait a moment and try again."
+          : "Could not log in. Please try again.");
+      } finally { busy = false; $("loginBtn").disabled = false; }
+    });
+  </script>
+</body>
+</html>
