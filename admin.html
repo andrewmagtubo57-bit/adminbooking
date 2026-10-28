@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#171717">
+  <title>Admin | AndrewGo Rentals</title>
+  <link rel="stylesheet" href="booking.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" role="img" aria-label="AndrewGo Rentals logo">
+        <rect width="48" height="48" rx="12" fill="#171717"/>
+        <path d="M24 3a6 6 0 0 0-6 6c0 4.5 6 10 6 10s6-5.5 6-10a6 6 0 0 0-6-6z" fill="#21F1A8"/>
+        <circle cx="24" cy="9" r="2.2" fill="#171717"/>
+        <path d="M13 26l2.5-5.5h17L35 26z" fill="#21F1A8"/>
+        <rect x="8" y="26" width="32" height="10" rx="3" fill="#21F1A8"/>
+        <circle cx="16" cy="37" r="3.6" fill="#171717" stroke="#21F1A8" stroke-width="2"/>
+        <circle cx="32" cy="37" r="3.6" fill="#171717" stroke="#21F1A8" stroke-width="2"/>
+      </svg>
+      <h1>AndrewGo Admin</h1>
+    </div>
+    <nav><span id="adminEmail" class="admin-email"></span><a href="home.html">My Biodata</a></nav>
+  </header>
+
+  <p id="pageMsg" class="msg" role="status" style="margin:12px 14px"></p>
+
+  <div id="adminArea" class="admin" hidden>
+    <aside class="side" aria-label="Admin navigation">
+      <a href="#overview" id="nav-overview" class="active">📊 Overview</a>
+      <a href="#bookings" id="nav-bookings">📋 Bookings <span id="navCount" class="count" hidden>0</span></a>
+      <a href="#cars" id="nav-cars">🚗 Cars</a>
+      <a href="#inventory" id="nav-inventory">📦 Inventory</a>
+    </aside>
+
+    <div class="content">
+      <p id="adminMsg" class="msg" role="status"></p>
+
+      <!-- OVERVIEW -->
+      <section id="view-overview">
+        <h2 class="first">Overview</h2>
+        <div id="stats" class="stats"></div>
+        <h2>Latest requests</h2>
+        <div id="recent"></div>
+      </section>
+
+      <!-- BOOKINGS -->
+      <section id="view-bookings" hidden>
+        <h2 class="first">Bookings</h2>
+        <div id="filters" class="tabs"></div>
+        <div id="bookingList"></div>
+      </section>
+
+      <!-- CARS -->
+      <section id="view-cars" hidden>
+        <h2 class="first">Cars</h2>
+        <form id="carForm" class="panel" novalidate>
+          <strong id="carFormTitle">Add a car</strong>
+          <div class="row">
+            <div><label for="cName">Name</label><input id="cName" maxlength="60" placeholder="e.g. Toyota Vios"></div>
+            <div><label for="cType">Type</label><input id="cType" list="typeList" maxlength="30" placeholder="Sedan, SUV, Van..."><datalist id="typeList"></datalist></div>
+          </div>
+          <div class="row">
+            <div><label for="cSeats">Seats</label><input id="cSeats" type="number" min="1" max="60" placeholder="4"></div>
+            <div><label for="cPrice">Price per day (₱)</label><input id="cPrice" type="number" min="1" placeholder="1800"></div>
+          </div>
+          <label for="cIcon">Emoji icon (shown when there is no photo)</label>
+          <input id="cIcon" maxlength="4" placeholder="🚗">
+          <p id="carMsg" class="msg" role="status"></p>
+          <button class="btn" id="carSave" type="submit">Add car</button>
+          <button class="btn alt" id="carCancel" type="button" hidden>Cancel edit</button>
+        </form>
+        <div id="carGrid" class="grid" style="margin-top:14px"></div>
+        <h2>Sample data</h2>
+        <p class="muted">Adds sample vehicles (safe to press again; bookings are not erased).</p>
+        <button class="btn alt" id="seedBtn" type="button">Add sample vehicles</button>
+      </section>
+
+      <!-- INVENTORY -->
+      <section id="view-inventory" hidden>
+        <h2 class="first">Inventory</h2>
+        <div id="invStats" class="stats"></div>
+        <div class="table-wrap"><table class="tbl" id="invTable"></table></div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth, db } from "./firebase-config.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import { doc, getDoc, setDoc, deleteDoc, collection, query, onSnapshot, writeBatch, arrayUnion, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    const $ = id => document.getElementById(id);
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+    const say = (id, text, type = "error") => { const m = $(id); m.textContent = text; m.className = text ? `msg ${type}` : "msg"; };
+    const money = n => "₱" + Number(n || 0).toLocaleString();
+
+    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+    // Same-day bookings (start === end) occupy that whole day
+    const addDay = s => { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+    const effEnd = (s, e) => e > s ? e : addDay(s);
+    const overlaps = (r, a, b) => r.start < effEnd(a, b) && effEnd(r.start, r.end) > a;
+    const fmtRange = r => r.start === r.end ? r.start : `${r.start} → ${r.end}`;
+
+    let bookings = [], vehicles = [], filter = "pending", editingId = null;
+
+    /* ---------- Navigation ---------- */
+    const VIEWS = ["overview", "bookings", "cars", "inventory"];
+    function route() {
+      const h = location.hash.slice(1), name = VIEWS.includes(h) ? h : "overview";
+      VIEWS.forEach(n => { $("view-" + n).hidden = n !== name; $("nav-" + n).classList.toggle("active", n === name); });
+      say("adminMsg", "");
+    }
+    window.addEventListener("hashchange", route);
+
+    /* ---------- Samples ---------- */
+    const SAMPLE = [
+      ["vios", "Toyota Vios", "Sedan", 4, 1800, "🚗"], ["city", "Honda City", "Sedan", 5, 2000, "🚗"],
+      ["innova", "Toyota Innova", "Van", 7, 3200, "🚐"], ["montero", "Mitsubishi Montero", "SUV", 7, 4500, "🚙"],
+      ["fortuner", "Toyota Fortuner", "SUV", 7, 4800, "🚙"], ["hilux", "Toyota Hilux", "Pickup", 5, 4000, "🛻"],
+      ["click", "Honda Click V3", "Motorbike", 2, 800, "🏍️"], ["aerox", "Yamaha Aerox", "Motorbike", 2, 1000, "🏍️"],
+      ["mio", "Yamaha Mio", "Motorbike", 2, 600, "🏍️"], ["raider", "Suzuki Raider FI", "Motorbike", 2, 900, "🏍️"]
+    ];
+    $("seedBtn").addEventListener("click", async () => {
+      try {
+        await Promise.all(SAMPLE.map(([id, name, type, seats, pricePerDay, icon]) =>
+          setDoc(doc(db, "vehicles", id), { name, type, seats, pricePerDay, icon, image: `images/${id}.jpg` }, { merge: true })));
+        say("adminMsg", "Sample vehicles added.", "ok");
+      } catch (e) { console.error(e); say("adminMsg", "Could not add vehicles. Check your Firestore rules."); }
+    });
+
+    /* ---------- Approve / Reject ---------- */
+    async function decide(b, approve, reason, buttons, errBox) {
+      say("adminMsg", ""); errBox.textContent = ""; errBox.className = "msg";
+      if (!approve && !reason.trim()) {
+        errBox.textContent = "Please write the reason for rejecting this request. The customer will see it.";
+        errBox.className = "msg error"; return;
+      }
+      buttons.forEach(x => x.disabled = true);
+      try {
+        const batch = writeBatch(db), vRef = doc(db, "vehicles", b.vehicleId);
+        if (approve) {
+          const v = (await getDoc(vRef)).data() || {};
+          if ((v.bookedRanges || []).some(r => overlaps(r, b.pickupDate, b.returnDate))) {
+            errBox.textContent = "Those dates were already approved for another booking. Please reject this request and explain why.";
+            errBox.className = "msg error"; buttons.forEach(x => x.disabled = false); return;
+          }
+          batch.update(vRef, { bookedRanges: arrayUnion({ start: b.pickupDate, end: b.returnDate }) });
+          batch.update(doc(db, "bookings", b.id), { status: "approved", reviewedAt: serverTimestamp() });
+        } else {
+          batch.update(doc(db, "bookings", b.id), { status: "rejected", rejectReason: reason.trim(), reviewedAt: serverTimestamp() });
+        }
+        await batch.commit();
+      } catch (e) { console.error(e); say("adminMsg", "Could not save your decision."); buttons.forEach(x => x.disabled = false); }
+    }
+
+    /* ---------- Rendering ---------- */
+    const detail = (k, v) => { const p = el("p", "kv"); p.append(el("span", "muted", k + " "), document.createTextNode(v)); return p; };
+    const pill = s => el("span", `pill ${s}`, s);
+
+    function renderOverview() {
+      const by = s => bookings.filter(b => b.status === s);
+      const revenue = by("approved").reduce((t, b) => t + Number(b.total || 0), 0);
+      const out = vehicles.filter(v => (v.bookedRanges || []).some(r => overlaps(r, today, today))).length;
+      const items = [
+        ["Pending requests", by("pending").length, "warn"], ["Approved bookings", by("approved").length, ""],
+        ["Total bookings", bookings.length, ""], ["Cars in fleet", vehicles.length, ""],
+        ["Booked today", out, ""], ["Approved revenue", money(revenue), "big"]
+      ];
+      const box = $("stats"); box.replaceChildren();
+      items.forEach(([label, val, cls]) => { const s = el("div", "stat " + cls); s.append(el("strong", "", String(val)), el("span", "muted", label)); box.append(s); });
+
+      const rec = $("recent"); rec.replaceChildren();
+      if (!bookings.length) { rec.append(el("p", "muted", "No bookings yet.")); return; }
+      bookings.slice(0, 5).forEach(b => {
+        const r = el("div", "panel row-between");
+        const left = el("div"); left.append(el("strong", "", b.vehicleName), el("p", "muted", `${b.customerName || b.userName || "Customer"} · ${b.pickupDate} → ${b.returnDate}`));
+        r.append(left, pill(b.status)); rec.append(r);
+      });
+      const n = by("pending").length;
+      if (n) { const a = el("a", "btn linkbtn", `Review ${n} pending request${n > 1 ? "s" : ""}`); a.href = "#bookings"; rec.append(a); }
+    }
+
+    function renderBookings() {
+      const pend = bookings.filter(b => b.status === "pending").length;
+      $("navCount").textContent = pend; $("navCount").hidden = !pend;
+
+      const tabs = $("filters"); tabs.replaceChildren();
+      ["pending", "approved", "rejected", "cancelled", "all"].forEach(f => {
+        const n = f === "all" ? bookings.length : bookings.filter(b => b.status === f).length;
+        const t = el("button", "tab" + (filter === f ? " on" : ""), `${f[0].toUpperCase() + f.slice(1)} (${n})`);
+        t.type = "button"; t.onclick = () => { filter = f; renderBookings(); }; tabs.append(t);
+      });
+
+      const box = $("bookingList"); box.replaceChildren();
+      const list = bookings.filter(b => filter === "all" || b.status === filter);
+      if (!list.length) { box.append(el("p", "muted", filter === "pending" ? "No pending requests. You're all caught up." : "Nothing here yet.")); return; }
+
+      list.forEach(b => {
+        const c = el("div", "panel booking"), top = el("div", "row-between");
+        top.append(el("strong", "", b.vehicleName), pill(b.status));
+        c.append(top,
+          detail("Customer:", `${b.customerName || b.userName || "Customer"} · ${b.phone || "no number"}`),
+          detail("Email:", b.userEmail || "—"),
+          detail("Address:", b.address || "not provided"),
+          detail("Dates:", `${b.pickupDate} → ${b.returnDate} (${b.days} day${b.days > 1 ? "s" : ""})`),
+          detail("Destination:", b.location || "—"),
+          detail("Payment:", b.paymentMethod || "Cash on pick-up"),
+          el("p", "price", `Total: ${money(b.total)}`));
+
+        if (b.status === "pending") {
+          const lbl = el("label", "", "Reason for rejection (required to reject, shown to the customer)");
+          const ta = el("textarea"); ta.rows = 3; ta.maxLength = 300; ta.placeholder = "e.g. The vehicle is under maintenance on those dates.";
+          ta.id = "why-" + b.id; lbl.htmlFor = ta.id;
+          const err = el("p", "msg");
+          const ok = el("button", "btn", "Approve"), no = el("button", "btn no", "Reject");
+          ok.type = no.type = "button";
+          ok.onclick = () => decide(b, true, ta.value, [ok, no], err);
+          no.onclick = () => decide(b, false, ta.value, [ok, no], err);
+          c.append(lbl, ta, err, ok, document.createTextNode(" "), no);
+        } else if (b.status === "rejected") {
+          const why = el("div", "reason-box"); why.append(el("strong", "", "Rejection reason:"), el("p", "", b.rejectReason || "No reason was recorded."));
+          c.append(why);
+        }
+        box.append(c);
+      });
+    }
+
+    function renderCars() {
+      $("typeList").replaceChildren(...[...new Set(vehicles.map(v => v.type))].map(t => { const o = el("option"); o.value = t; return o; }));
+      const box = $("carGrid"); box.replaceChildren();
+      if (!vehicles.length) { box.append(el("p", "muted", "No cars yet. Add one above or use the sample data.")); return; }
+      vehicles.forEach(v => {
+        const c = el("div", "car");
+        c.append(el("div", "car-icon", v.icon || "🚗"), el("strong", "", `${v.name} (1)`),
+          el("span", "muted", `${v.type} · ${v.seats} seats`), el("span", "price", `${money(v.pricePerDay)} / day`));
+        const edit = el("button", "btn alt", "Edit"), del = el("button", "btn no", "Remove");
+        edit.type = del.type = "button";
+        edit.onclick = () => {
+          editingId = v.id; $("cName").value = v.name; $("cType").value = v.type; $("cSeats").value = v.seats;
+          $("cPrice").value = v.pricePerDay; $("cIcon").value = v.icon || "";
+          $("carFormTitle").textContent = `Edit ${v.name}`; $("carSave").textContent = "Save changes"; $("carCancel").hidden = false;
+          $("carForm").scrollIntoView({ behavior: "smooth" });
+        };
+        del.onclick = async () => {
+          if (!confirm(`Remove ${v.name}? Existing bookings are kept.`)) return;
+          try { await deleteDoc(doc(db, "vehicles", v.id)); say("adminMsg", `${v.name} removed.`, "ok"); }
+          catch (e) { console.error(e); say("adminMsg", "Could not remove the car. Check your Firestore rules."); }
+        };
+        c.append(edit, del); box.append(c);
+      });
+    }
+
+    function resetCarForm() {
+      editingId = null; $("carForm").reset(); say("carMsg", "");
+      $("carFormTitle").textContent = "Add a car"; $("carSave").textContent = "Add car"; $("carCancel").hidden = true;
+    }
+    $("carCancel").addEventListener("click", resetCarForm);
+    $("carForm").addEventListener("submit", async e => {
+      e.preventDefault(); say("carMsg", "");
+      const name = $("cName").value.trim(), type = $("cType").value.trim(), seats = Number($("cSeats").value), price = Number($("cPrice").value);
+      if (!name || !type) return say("carMsg", "Enter the car name and type.");
+      if (!(seats >= 1) || !(price >= 1)) return say("carMsg", "Seats and price per day must be at least 1.");
+      const id = editingId || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      if (!id) return say("carMsg", "Please use letters or numbers in the car name.");
+      if (!editingId && vehicles.some(v => v.id === id)) return say("carMsg", "A car with this name already exists. Use Edit instead.");
+      $("carSave").disabled = true;
+      try {
+        await setDoc(doc(db, "vehicles", id), { name, type, seats, pricePerDay: price, icon: $("cIcon").value.trim() || "🚗", image: `images/${id}.jpg` }, { merge: true });
+        say("adminMsg", editingId ? "Car updated." : "Car added.", "ok"); resetCarForm();
+      } catch (err) { console.error(err); say("carMsg", "Could not save the car. Check your Firestore rules."); }
+      finally { $("carSave").disabled = false; }
+    });
+
+    function renderInventory() {
+      const state = v => {
+        const rs = v.bookedRanges || [];
+        return rs.some(r => overlaps(r, today, today)) ? "Booked today" : "Available";
+      };
+      const avail = vehicles.filter(v => state(v) === "Available").length;
+      const stats = [["Total units", vehicles.length], ["Available today", avail], ["Booked today", vehicles.length - avail]];
+      const sb = $("invStats"); sb.replaceChildren();
+      stats.forEach(([l, n]) => { const s = el("div", "stat"); s.append(el("strong", "", String(n)), el("span", "muted", l)); sb.append(s); });
+
+      const t = $("invTable"); t.replaceChildren();
+      const head = el("tr"); ["Car", "Type", "Units", "Today", "Upcoming booked dates", "Approved bookings"].forEach(h => head.append(el("th", "", h)));
+      const thead = el("thead"); thead.append(head); t.append(thead);
+      const body = el("tbody");
+      if (!vehicles.length) { const r = el("tr"), td = el("td", "muted", "No cars in inventory yet."); td.colSpan = 6; r.append(td); body.append(r); }
+      vehicles.forEach(v => {
+        const up = (v.bookedRanges || []).filter(r => effEnd(r.start, r.end) > today).sort((a, b) => a.start < b.start ? -1 : 1);
+        const approved = bookings.filter(b => b.vehicleId === v.id && b.status === "approved").length;
+        const s = state(v), r = el("tr");
+        const st = el("td"); st.append(el("span", "pill " + (s === "Available" ? "approved" : "rejected"), s));
+        r.append(el("td", "", `${v.icon || "🚗"} ${v.name}`), el("td", "", v.type), el("td", "", "1"), st,
+          el("td", "", up.length ? up.map(fmtRange).join(" · ") : "—"), el("td", "", String(approved)));
+        body.append(r);
+      });
+      t.append(body);
+    }
+
+    const renderAll = () => { renderOverview(); renderBookings(); renderCars(); renderInventory(); };
+
+    function watchAll() {
+      onSnapshot(query(collection(db, "bookings")), snap => {
+        bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.createdAt?.seconds || 9e9) - (a.createdAt?.seconds || 9e9));
+        renderAll();
+      }, e => { console.error(e); say("adminMsg", "Could not load bookings. Check your Firestore rules."); });
+      onSnapshot(collection(db, "vehicles"), snap => {
+        vehicles = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name));
+        renderAll();
+      }, e => { console.error(e); say("adminMsg", "Could not load vehicles. Check your Firestore rules."); });
+    }
+
+    onAuthStateChanged(auth, async u => {
+      if (!u) { window.location.replace("login.html"); return; }
+      try {
+        const a = await getDoc(doc(db, "admins", u.uid));
+        if (!a.exists()) { say("pageMsg", "This page is for admins only."); return; }
+        $("adminEmail").textContent = u.email || "";
+        $("adminArea").hidden = false; route(); watchAll();
+      } catch (e) { console.error(e); say("pageMsg", "Could not verify admin access."); }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+*{box-sizing:border-box}
+:root{--page:#171717;--card:#21F1A8;--input:#C8FFEC;--panel:#222;--ink:#171717}
+[hidden]{display:none!important}
+body{margin:0;background:var(--page);color:#fff;font-family:Arial,Helvetica,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;background:var(--card);color:var(--ink)}
+header h1{margin:0;font-size:1.2rem}
+header a{color:var(--ink);font-weight:700;text-decoration:none;margin-left:14px}
+main{max-width:1000px;margin:0 auto;padding:12px 14px 40px}
+h2{color:var(--card);margin:26px 0 12px;font-size:1.15rem}
+.panel{background:var(--panel);border-left:4px solid var(--input);border-radius:10px;padding:16px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.car{display:flex;flex-direction:column;gap:6px;background:var(--panel);border:2px solid transparent;border-left:4px solid var(--input);border-radius:10px;padding:14px}
+.car.active{border-color:var(--card)}
+.car-icon{font-size:2.2rem}
+.muted{color:#b5b5b5;font-size:14px}
+.price{color:var(--card);font-weight:700}
+label{display:block;margin:12px 0 6px;font-weight:700;font-size:14px}
+input,select{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--ink);border-radius:6px;background:var(--input);color:var(--ink);font-size:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{min-height:42px;padding:10px 16px;margin-top:8px;border:0;border-radius:6px;background:var(--card);color:var(--ink);font-size:15px;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:wait}
+.btn.alt{background:var(--input)}
+.btn.no{background:#ff8a8a}
+.msg{margin:10px 0;padding:10px;border-radius:6px;font-weight:700;font-size:14px}
+.msg:empty{display:none}
+.msg.error{background:#3a1d1d;color:#ff8a8a}
+.msg.ok{background:#12372b;color:var(--card)}
+.row-between{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pill{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;text-transform:uppercase;background:#444}
+.pill.pending{background:#5a4a12;color:#ffd75e}
+.pill.approved{background:#12372b;color:var(--card)}
+.pill.rejected{background:#3a1d1d;color:#ff8a8a}
+.note.approved{color:var(--card)}.note.rejected{color:#ff8a8a}
+.booking p{margin:6px 0}
+@media(max-width:520px){.row{grid-template-columns:1fr}}
+.car-img{width:100%;height:120px;object-fit:contain;background:#2c2c2c;border-radius:8px}
+.pill.cancelled{background:#333;color:#b5b5b5}.note.cancelled{color:#b5b5b5}
+
+/* Receipt + terms */
+.receipt{background:#fff;color:var(--ink);font-family:"Courier New",monospace;border-radius:8px;padding:14px 16px;margin:10px 0;border-top:4px dashed var(--card)}
+.receipt-title{text-align:center;font-weight:700;letter-spacing:2px;padding-bottom:8px;margin-bottom:8px;border-bottom:1px dashed #888}
+.r-line{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:14px}
+.r-line span:last-child{text-align:right;font-weight:700;word-break:break-word}
+.r-line.total{margin-top:8px;padding-top:10px;border-top:2px dashed #888;font-size:18px}
+.terms ul{margin:8px 0 0;padding-left:20px;line-height:1.7}
+/* ===== Logo + brand ===== */
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;flex:none}
+header nav{display:flex;align-items:center;gap:4px}
+.admin-email{font-size:13px;opacity:.75}
+
+/* ===== Booked-car styling (booking page) ===== */
+.car{position:relative}
+.car.booked{background:#3a1d1d;border-color:#ff8a8a;border-left-color:#ff8a8a}
+.car.booked .price{color:#ff8a8a}
+.booked-badge{align-self:flex-start;background:#ff8a8a;color:var(--ink);font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px}
+.booked-list{display:flex;flex-direction:column;gap:3px;font-size:13px;background:rgba(255,138,138,.12);border-radius:6px;padding:8px}
+.booked-title{font-weight:700;color:#ffb3b3}
+.booked-date{color:#ffd0d0}
+.reason-box{background:#3a1d1d;border-left:4px solid #ff8a8a;border-radius:6px;padding:10px 12px;margin:10px 0 4px}
+.reason-box p{margin:4px 0 0;color:#ffd0d0}
+
+/* ===== Admin layout ===== */
+textarea{width:100%;padding:10px 12px;border:1px solid var(--ink);border-radius:6px;background:var(--input);color:var(--ink);font-size:16px;font-family:inherit;resize:vertical}
+.admin{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 70px)}
+.side{background:#1c1c1c;border-right:1px solid #2e2e2e;padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+.side a{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;color:#cfcfcf;font-weight:700;font-size:14px;text-decoration:none}
+.side a:hover{background:#2a2a2a}
+.side a.active{background:var(--card);color:var(--ink)}
+.count{margin-left:auto;background:#ff8a8a;color:var(--ink);border-radius:99px;font-size:12px;min-width:22px;text-align:center;padding:1px 7px}
+.content{padding:6px 22px 40px;min-width:0;max-width:1100px;width:100%}
+h2.first{margin-top:18px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.stat{display:flex;flex-direction:column;gap:4px;background:var(--panel);border-left:4px solid var(--input);border-radius:10px;padding:14px}
+.stat strong{font-size:1.7rem;color:var(--card)}
+.stat.warn{border-left-color:#ffd75e}.stat.warn strong{color:#ffd75e}
+.stat.big strong{font-size:1.4rem}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.tab{min-height:38px;padding:8px 14px;border:1px solid #444;border-radius:99px;background:transparent;color:#ddd;font-weight:700;cursor:pointer}
+.tab.on{background:var(--card);color:var(--ink);border-color:var(--card)}
+.kv{margin:6px 0}
+.linkbtn{display:inline-block;text-decoration:none;line-height:22px}
+.panel textarea{margin-bottom:4px}
+.table-wrap{overflow-x:auto;margin-top:14px}
+.tbl{width:100%;border-collapse:collapse;background:var(--panel);border-radius:10px;overflow:hidden;font-size:14px}
+.tbl th{text-align:left;background:#2c2c2c;color:var(--card);padding:12px;white-space:nowrap}
+.tbl td{padding:12px;border-top:1px solid #333;vertical-align:top}
+@media(max-width:760px){
+  .admin{grid-template-columns:1fr}
+  .side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid #2e2e2e;padding:8px}
+  .side a{white-space:nowrap}
+  .content{padding:6px 14px 40px}
+}
